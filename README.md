@@ -19,3 +19,7 @@ Performance Metrics
 3.  Per record processing time: ~8-14ms (line-by-line)
 
 Technologies: Kubernetes, Apache Kafka, KSQL, Google Cloud Platform, Shell Scripting
+
+The implementation began with deploying Apache Kafka in Google Cloud Platform's Kubernetes Engine using the available marketplace image. I configured the deployment with essential parameters including namespace configuration (default), storage class (premium-rwo), and resource allocations for both Kafka (10Gi) and ZooKeeper (5Gi) instances. The deployment resulted in a fully functional Kafka cluster consisting of kafka-check-kafka-0 pod for the broker, kafka-check-kafka-exporter for metrics collection, and kafka-check-zk-0 for ZooKeeper coordination.
+
+Following the cluster setup, I established a data pipeline for processing sensor readings. The pipeline began with uploading our dataset containing 2.3 million temperature, humidity, light, and voltage readings to a GCP bucket. I then implemented a streaming mechanism using kubectl commands to transfer data from the GCS bucket to our Kafka cluster. The data ingestion process utilized Kafka's console producer with the command kubectl exec, streaming data through the kafka-check-kafka-headless:9092 broker to a dedicated topic named 'sensor_data'.
