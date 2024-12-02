@@ -51,3 +51,7 @@ Data pipeline implementation showing the real-time streaming of sensor data thro
 Real-time anomaly detection results showing identified anomalies in the sensor data. Each line represents an anomaly detected with its corresponding timestamp, moteid, temperature, humidity, and voltage values, followed by the 'ANOMALY' flag, demonstrating the effectiveness of our threshold-based detection system.
 
 ![image](res_detect.png)
+
+
+Result:
+The performance analysis revealed significant differences between the two approaches. The line-by-line processing exhibited considerable computational overhead, requiring approximately 8-14ms per record and resulting in a total processing duration of 6.3 hours for the complete dataset. In contrast, the stream processing implementation demonstrated remarkable efficiency, completing the entire analysis in 10-15 minutes while maintaining the same detection accuracy. This improvement was achieved through parallel processing capabilities and optimized memory usage, making it particularly suitable for real-time IoT monitoring applications. The implementation on Google Cloud Platform's Kubernetes Engine provided automated resource management and horizontal scalability, enabling efficient processing of large-scale sensor data streams.
