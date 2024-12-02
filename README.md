@@ -25,4 +25,19 @@ The implementation began with deploying Apache Kafka in Google Cloud Platform's 
 Following the cluster setup, I established a data pipeline for processing sensor readings. The pipeline began with uploading our dataset containing 2.3 million temperature, humidity, light, and voltage readings to a GCP bucket. I then implemented a streaming mechanism using kubectl commands to transfer data from the GCS bucket to our Kafka cluster. The data ingestion process utilized Kafka's console producer with the command kubectl exec, streaming data through the kafka-check-kafka-headless:9092 broker to a dedicated topic named 'sensor_data'.
 
 As we spin up the GKE, we first check its status,
+
 ![pod check](initial_pod_check.png)
+
+We then Upload our source data to GCP buckets
+
+![bucket](data.png)
+
+Now we create a new topic and check whether the topic is created succesfully
+
+![topic](topic.png)
+
+Now we set up the data pipeline from GCP buckets to kubernetes pods
+
+![image](pipeline1.png)
+
+![image](pipeline1.png)
