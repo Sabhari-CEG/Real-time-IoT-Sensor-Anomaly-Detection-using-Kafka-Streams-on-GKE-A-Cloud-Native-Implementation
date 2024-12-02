@@ -2,11 +2,11 @@
 A high-performance, cloud-native solution for real-time anomaly detection in IoT sensor networks using Apache Kafka on GKE. This project demonstrates advanced streaming data processing by implementing two distinct approaches: a traditional line-by-line method and an optimized KSQL stream processing solution,achieving a 25x performance improvement. 
 
 Key Features:
-• Cloud-native deployment on GKE with Kafka clusters
-• Real-time anomaly detection for temperature, humidity, and voltage readings
-• Scalable data pipeline processing 2.3M+ records
-• Performance optimization from 6.3 hours to 10-15 minutes processing time
-• Implementation of both traditional and KSQL stream processing approaches (Dual implementation approach)
+1. Cloud-native deployment on GKE with Kafka clusters
+2.  Real-time anomaly detection for temperature, humidity, and voltage readings
+3. Scalable data pipeline processing 2.3M+ records
+4. Performance optimization from 6.3 hours to 10-15 minutes processing time
+5. Implementation of both traditional and KSQL stream processing approaches (Dual implementation approach)
 
 Anomaly Detection Parameters:
 1. Temperature: > 100° or < 0°
