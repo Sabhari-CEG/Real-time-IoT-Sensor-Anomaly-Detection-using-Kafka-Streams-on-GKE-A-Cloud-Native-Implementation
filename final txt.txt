@@ -1,0 +1,169 @@
+first we had spinned up the kafka pods in a cluster and checking its configuration. we are spinning this up with the available image in GCP market place.
+sabhari2000@cloudshell:~$ kubectl get pods
+NAME                                          READY   STATUS      RESTARTS      AGE
+kafka-check-deployer-82bsn                    0/1     Completed   0             96m
+kafka-check-kafka-0                           1/1     Running     1 (94m ago)   95m
+kafka-check-kafka-exporter-74db7798c8-ggk5k   1/1     Running     2 (94m ago)   95m
+kafka-check-zk-0                              1/1     Running     0             95m
+
+we uploaded our data into the GCP buckets and we are copying it to our pods from buckets.
+sabhari2000@cloudshell:~$ gsutil cp gs://temperature_sensor_data/data.txt /tmp/sensor_data.txt
+Copying gs://temperature_sensor_data/data.txt...
+/ [1 files][143.9 MiB/143.9 MiB]                                                
+Operation completed over 1 objects/143.9 MiB.
+
+now we are setting up the pipeline from the data in our local and creating the new topic.
+sabhari2000@cloudshell:~$ cat /tmp/sensor_data.txt | kubectl exec -i kafka-check-kafka-0 -- bin/kafka-console-producer.sh --broker-list kafka-check-kafka-headless:9092 --topic sensor_data
+
+
+In the new terminal, we are checking whether we are getting the data from the topic, and we get the data. which means, we had successfully set the topic and data pipeline.
+kubectl exec -it kafka-check-kafka-0 -- bin/kafka-console-consumer.sh --bootstrap-server kafka-check-kafka-headless:9092 --topic sensor_data --from-beginning
+
+we are gonna analyze the anamoly in two different ways, one while reading the data through pipeline and other through ksql.
+
+1. data pipeline
+
+first lets create the topic for anamolies
+kubectl exec -it kafka-check-kafka-0 -- bin/kafka-topics.sh --create --topic sensor_anomalies --bootstrap-server kafka-check-kafka-headless:9092 --partitions 1 --replication-factor 1
+
+and now we read the data and put the anamolies data into this topic by using
+cat /tmp/sensor_data.txt | while IFS=' ' read -r timestamp epoch moteid temperature humidity light voltage; do
+    # Stream all data to sensor_data topic
+    echo "$timestamp $epoch $moteid $temperature $humidity $light $voltage" | kubectl exec -i kafka-check-kafka-0 -- bin/kafka-console-producer.sh --broker-list kafka-check-kafka-headless:9092 --topic sensor_data
+    
+    # Check for anomalies and stream to anomalies topic
+    if (( $(echo "$temperature" | tr -d '.') > 10000 )) || \
+       (( $(echo "$temperature" | tr -d '.') < 0 )) || \
+       (( $(echo "$humidity" | tr -d '.') < 0 )) || \
+       (( $(echo "$humidity" | tr -d '.') > 10000 )) || \
+       (( $(echo "$voltage" | tr -d '.') < 150 )) || \
+       (( $(echo "$voltage" | tr -d '.') > 300 )); then
+        anomaly_message="$timestamp,$moteid,$temperature,$humidity,$voltage,ANOMALY"
+        echo "$anomaly_message" | kubectl exec -i kafka-check-kafka-0 -- bin/kafka-console-producer.sh --broker-list kafka-check-kafka-headless:9092 --topic sensor_anomalies
+    fi
+done
+
+now we check in other terminal, whether we got any anomalies by using
+kubectl exec -it kafka-check-kafka-0 -- bin/kafka-console-consumer.sh --bootstrap-server kafka-check-kafka-headless:9092 --topic sensor_anomalies --from-beginning
+
+we get anomalies, and we can get the anomalies detected in real time. And for this dataset, we are doing the current line-by-line processing approach. Per record processing: ~8-14ms and for total of 2.3 million records, it took nearly 6.3 hours (adequate storage and performance provided).
+
+
+
+
+2. KSQL
+we install the necessary package that is confluent which is required to run the ksql
+
+sabhari2000@cloudshell:~$ curl https://raw.githubusercontent.com/helm/helm/master/scripts/get-helm-3 | bash
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+100 11903  100 11903    0     0  72232      0 --:--:-- --:--:-- --:--:-- 72579
+Helm v3.16.3 is available. Changing from version v3.9.3.
+Downloading https://get.helm.sh/helm-v3.16.3-linux-amd64.tar.gz
+Verifying checksum... Done.
+Preparing to install helm into /usr/local/bin
+helm installed into /usr/local/bin/helm
+sabhari2000@cloudshell:~$ helm repo add confluentinc https://packages.confluent.io/helm
+"confluentinc" has been added to your repositories
+sabhari2000@cloudshell:~$ helm repo update
+Hang tight while we grab the latest from your chart repositories...
+...Successfully got an update from the "confluentinc" chart repository
+Update Complete. ⎈Happy Helming!⎈
+sabhari2000@cloudshell:~$ helm install kafka-ksql confluentinc/confluent-for-kubernetes --namespace default
+NAME: kafka-ksql
+LAST DEPLOYED: Mon Dec  2 03:45:35 2024
+NAMESPACE: default
+STATUS: deployed
+REVISION: 1
+TEST SUITE: None
+NOTES:
+The Confluent Operator
+
+The Confluent Operator brings the component (Confluent Services) specific controllers for kubernetes by providing components specific Custom Resource
+Definition (CRD) as well as managing other Confluent Platform services
+
+
+
+
+Creates a base stream that:
+Defines the schema for incoming sensor data (timestamp, epoch, moteid, temperature, humidity, light, voltage)
+Connects to the 'sensor_data' Kafka topic
+Uses delimited format for values
+Uses reading_timestamp as the event timestamp
+
+
+CREATE STREAM sensor_readings (
+    reading_timestamp VARCHAR,
+    epoch INTEGER,
+    moteid INTEGER,
+    temperature DOUBLE,
+    humidity DOUBLE,
+    light DOUBLE,
+    voltage DOUBLE
+) WITH (
+    kafka_topic='sensor_data',
+    value_format='DELIMITED',
+    timestamp='reading_timestamp'
+);
+
+we had deleted the previous sensor anomalies topic and now
+Second Stream: sensor_anomalies
+Creates an anomaly detection stream that:
+Creates a new topic 'sensor_anomalies' for storing detected anomalies
+Continuously monitors the sensor_readings stream
+Detects anomalies based on thresholds:
+Temperature: > 100° or < 0°
+Humidity: < 0% or > 100%
+Voltage: < 1.5V or > 3.0V
+Only emits records that meet anomaly conditions
+
+
+CREATE STREAM sensor_anomalies 
+WITH (
+    kafka_topic='sensor_anomalies',
+    value_format='DELIMITED',
+    partitions=1,
+    replicas=1
+) AS
+SELECT 
+    reading_timestamp,
+    moteid,
+    temperature,
+    humidity,
+    CASE 
+        WHEN temperature > 100 OR temperature < 0 THEN 'Anomaly'
+        WHEN humidity < 0 OR humidity > 100 THEN 'Anomaly'
+        WHEN voltage < 1.5 OR voltage > 3.0 THEN 'Anomaly'
+        ELSE 'Normal'
+    END AS anomaly_status
+FROM sensor_readings
+WHERE 
+    temperature > 100 OR temperature < 0 OR
+    humidity < 0 OR humidity > 100 OR
+    voltage < 1.5 OR voltage > 3.0
+EMIT CHANGES;
+
+
+sabhari2000@cloudshell:~ (primarykeyplayers)$ kubectl exec -it kafka-check-kafka-0 -- bin/kafka-console-consumer.sh --bootstrap-server kafka-check-kafka-headless:9092 --topic sensor_anomalies --from-beginning
+2004-03-31,2,1,122.153,11.04 2.03397,ANOMALY
+2004-02-28,3,1,19.9884,45.08 2.69964,ANOMALY
+2004-02-28,11,1,19.3024,45.08 2.68742,ANOMALY
+2004-02-28,17,1,19.1652,45.08 2.68742,ANOMALY
+
+Processing Time for 2.3M Records
+For 2.3 million sensor readings:
+Using KSQL stream processing: ~10-15 minutes
+Much faster than line-by-line processing (which would take 5-8 hours)
+Performance depends on:
+Kafka broker resources
+Network throughput
+Complexity of anomaly detection logic
+Number of partitions
+KSQL's stream processing is significantly more efficient than the previous script-based approach because it:
+Processes data in parallel
+Uses Kafka's native streaming capabilities
+Optimizes memory usage
+Reduces network overhead
+
+
+
