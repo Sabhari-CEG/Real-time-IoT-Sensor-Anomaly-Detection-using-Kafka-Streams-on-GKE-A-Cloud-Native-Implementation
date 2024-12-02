@@ -24,20 +24,30 @@ The implementation began with deploying Apache Kafka in Google Cloud Platform's 
 
 Following the cluster setup, I established a data pipeline for processing sensor readings. The pipeline began with uploading our dataset containing 2.3 million temperature, humidity, light, and voltage readings to a GCP bucket. I then implemented a streaming mechanism using kubectl commands to transfer data from the GCS bucket to our Kafka cluster. The data ingestion process utilized Kafka's console producer with the command kubectl exec, streaming data through the kafka-check-kafka-headless:9092 broker to a dedicated topic named 'sensor_data'.
 
-As we spin up the GKE, we first check its status,
+As I spin up the GKE, first check its status,
 
 ![pod check](initial_pod_check.png)
 
-We then Upload our source data to GCP buckets
+I then Upload our source data to GCP buckets
 
 ![bucket](data.png)
 
-Now we create a new topic and check whether the topic is created succesfully
+Now I create a new topic and check whether the topic is created succesfully
 
 ![topic](topic.png)
 
-Now we set up the data pipeline from GCP buckets to kubernetes pods
+Now I set up the data pipeline from GCP buckets to kubernetes pods
 
 ![image](pipeline1.png)
 
 ![image](pipeline1.png)
+
+Then I proceed as given in the final txt.txt file and observed the realtime anamoly detection in two different terminals.
+
+Data pipeline implementation showing the real-time streaming of sensor data through Kafka topics. The output demonstrates successful data ingestion and processing through the Kafka broker, with each line representing a sensor reading containing timestamp, epoch, moteid, temperature, humidity, light, and voltage values.
+
+![image](res_read.png)
+
+Real-time anomaly detection results showing identified anomalies in the sensor data. Each line represents an anomaly detected with its corresponding timestamp, moteid, temperature, humidity, and voltage values, followed by the 'ANOMALY' flag, demonstrating the effectiveness of our threshold-based detection system.
+
+![image](res_detect.png)
