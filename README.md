@@ -14,8 +14,8 @@ Anomaly Detection Parameters:
 3. Voltage: < 1.5V or > 3.0V
 
 Performance Metrics
-> Line-by-line processing: 6.3 hours for 2.3M records
-> KSQL stream processing: 10-15 minutes for 2.3M records
-> Per record processing time: ~8-14ms (line-by-line)
+(*) Line-by-line processing: 6.3 hours for 2.3M records
+(*) KSQL stream processing: 10-15 minutes for 2.3M records
+(*) Per record processing time: ~8-14ms (line-by-line)
 
 Technologies: Kubernetes, Apache Kafka, KSQL, Google Cloud Platform, Shell Scripting
